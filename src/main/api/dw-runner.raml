@@ -1,0 +1,45 @@
+#%RAML 0.8
+---
+title: DataWeave Runner
+version: v1
+baseUri: http://localhost:8081/api
+documentation: 
+  - title: DataWeave Runner
+    content: Allows the interaction with mumuki
+/dw/exec: 
+  post: 
+    body: 
+      application/json: 
+        example: |
+          {
+            "locale": "en",
+            "content": "a: 1",
+            "test": "expected output",
+            "extra": "{\n  \"inputs\" : [{\n      \"name\" : \"in0\",\n      \"content\" : {\"name\" : \"Martin\"},\n      \"mimeType\" : \"application/json\"\n    }],\n  \"outputType\" : \"application/json\",\n  \"content\" : \"%dw 1.0\\n---\\n\"\n}",
+            "expectations": [
+              {
+                "binding": "..the binding...", 
+                "inspection": "...the inspection..."
+              }
+            ]
+          }
+
+          
+    responses: 
+      200: 
+        description: When executed succesfully
+        body: 
+          application/json: 
+            example: |
+             {
+                "exit": "passed/failed",
+                "out": "....the test runner raw output ...." ,
+                "feedback": "...the runner feedback....",
+                "expectationResults": [
+                  {
+                    "expectation": {
+                      "binding": "..the binding...", 
+                      "inspection": "...the inspection..."}, 
+                      "result": "true/false"}
+                ]
+              }

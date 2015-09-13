@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"  xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <http:listener-config xmlns:http="http://www.mulesoft.org/schema/mule/http" name="dw-runner-httpListenerConfig" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <apikit:config xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" name="dw-runner-config" raml="dw-runner.raml" consoleEnabled="true" consolePath="console" doc:name="Router"/>
+    <flow name="dw-runner-main">
+        <http:listener xmlns:http="http://www.mulesoft.org/schema/mule/http" config-ref="dw-runner-httpListenerConfig" path="/api/*" doc:name="HTTP"/>
+        <apikit:router xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" config-ref="dw-runner-config" doc:name="APIkit Router"/>
+        <exception-strategy ref="dw-runner-apiKitGlobalExceptionMapping" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="unescapeJsonString">
+        <dw:transform-message doc:name="Transform Message">
+        	<dw:input-payload mimeType="application/json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger level="INFO" doc:name="Logger" message="bla"/>
+    </flow>
+    <flow name="post:/dw/exec:dw-runner-config">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+using (extra = lookup("unescapeJsonString", payload.extra))
+//using (extra = payload.extra)
+{
+	inputs: extra.inputs map ($ as :object {class: "org.mule.dw.RequestInput"}),
+	transform: (extra.content default "") ++ payload.content,
+//	output: payload.mimeType
+	output: extra.outputType
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-component metadata:id="70779afb-e72b-4e1f-b7ed-a4c14b509f8e" doc:name="Execute DW"><![CDATA[import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.mule.dw.RequestInput;
+import org.mule.dw.OutputResult;
+
+
+import com.mulesoft.weave.mule.Input;
+import com.mulesoft.weave.mule.Output;
+import com.mulesoft.weave.mule.WeaveEngineHelper;
+
+List inputList = new ArrayList();
+for (RequestInput requestInput : payload.inputs) {
+	 String content = requestInput.getContent().toString();
+	 Input input = new Input(content, requestInput.getName(), requestInput.getMimeType());
+	inputList.add(input);
+}
+
+Output output = WeaveEngineHelper.execute(payload.transform, inputList,payload.output);
+payload = new OutputResult(output.content().toString(), output.mime());]]></expression-component>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	exit: "passed",
+	out: payload.content,
+	feedback: "",
+	expectationResults: []
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <set-payload value="#[exception.getCauseException().getMessage()]" doc:name="Build Exception Information"/>
+            <dw:transform-message doc:name="To Json Data">
+                <dw:input-payload doc:sample="UserDefined.dwl"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	exit: "failed",
+	out: payload,
+	feedback: "",
+	expectationResults: []
+}]]></dw:set-payload>
+            </dw:transform-message>
+        </catch-exception-strategy>
+    </flow>
+    <apikit:mapping-exception-strategy name="dw-runner-apiKitGlobalExceptionMapping">
+        <apikit:mapping statusCode="400">
+            <apikit:exception value="java.lang.Exception"/>
+            <set-payload value="#[exception.getCauseException().getMessage()]" doc:name="Copy_of_Build Exception Information"/>
+            <dw:transform-message doc:name="Copy_of_To Json Data">
+                <dw:input-payload doc:sample="UserDefined.dwl"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	exit: "failed",
+	out: payload,
+	feedback: "",
+	expectationResults: []
+}]]></dw:set-payload>
+            </dw:transform-message>
+        </apikit:mapping>
+    </apikit:mapping-exception-strategy>
+</mule>

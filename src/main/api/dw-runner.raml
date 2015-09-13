@@ -6,7 +6,7 @@ baseUri: http://localhost:8081/api
 documentation: 
   - title: DataWeave Runner
     content: Allows the interaction with mumuki
-/dw/exec: 
+/dw/test: 
   post: 
     body: 
       application/json: 
@@ -15,7 +15,7 @@ documentation:
             "locale": "en",
             "content": "a: 1",
             "test": "expected output",
-            "extra": "{\n  \"inputs\" : [{\n      \"name\" : \"in0\",\n      \"content\" : {\"name\" : \"Martin\"},\n      \"mimeType\" : \"application/json\"\n    }],\n  \"outputType\" : \"application/json\",\n  \"content\" : \"%dw 1.0\\n---\\n\"\n}",
+            "extra": "{\r\n  \"inputs\" : [{\r\n      \"name\" : \"in0\",\r\n      \"content\" : \"{\\\"name\\\" : \\\"Martin\\\"}\",\r\n      \"mimeType\" : \"application\/json\"\r\n    }],\r\n  \"outputType\" : \"application\/json\",\r\n  \"content\" : \"%dw 1.0\\n---\\n\"\r\n}",
             "expectations": [
               {
                 "binding": "..the binding...", 

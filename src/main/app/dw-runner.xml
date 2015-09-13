@@ -14,17 +14,12 @@ http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/m
         <exception-strategy ref="dw-runner-apiKitGlobalExceptionMapping" doc:name="Reference Exception Strategy"/>
     </flow>
     <flow name="unescapeJsonString">
-        <dw:transform-message doc:name="Transform Message">
-        	<dw:input-payload mimeType="application/json"/>
-            <dw:set-payload><![CDATA[%dw 1.0
-%output application/json
----
-payload]]></dw:set-payload>
-        </dw:transform-message>
-        <logger level="INFO" doc:name="Logger" message="bla"/>
+        <object-to-string-transformer mimeType="application/json" doc:name="Object to String"/>
     </flow>
-    <flow name="post:/dw/exec:dw-runner-config">
+    <flow name="post:/dw/test:dw-runner-config">
+        <logger message="#[&quot;\n######### ===INPUT=== ########\n&quot; + message.payloadAs(java.lang.String)]" level="INFO" doc:name="Logger"/>
         <dw:transform-message doc:name="Transform Message">
+        	<dw:input-payload mimeType="application/json" />
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 ---
@@ -69,6 +64,7 @@ payload = new OutputResult(output.content().toString(), output.mime());]]></expr
 	expectationResults: []
 }]]></dw:set-payload>
         </dw:transform-message>
+        <logger message="#[&quot;\n######### ===OUTPUT=== ########\n&quot; + message.payloadAs(java.lang.String)]" level="INFO" doc:name="Copy_of_Logger"/>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
             <set-payload value="#[exception.getCauseException().getMessage()]" doc:name="Build Exception Information"/>
             <dw:transform-message doc:name="To Json Data">

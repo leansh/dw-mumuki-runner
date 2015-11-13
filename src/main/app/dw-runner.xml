@@ -6,55 +6,37 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
 http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
-    <http:listener-config xmlns:http="http://www.mulesoft.org/schema/mule/http" name="dw-runner-httpListenerConfig" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <http:listener-config xmlns:http="http://www.mulesoft.org/schema/mule/http" name="dw-runner-httpListenerConfig" host="0.0.0.0" port="${http.port}" doc:name="HTTP Listener Configuration"/>
     <apikit:config xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" name="dw-runner-config" raml="dw-runner.raml" consoleEnabled="true" consolePath="console" doc:name="Router"/>
+    <http:request-config name="HTTP_Request_Configuration" host="dataweave-api.cloudhub.io" port="80" basePath="/api" doc:name="HTTP Request Configuration">
+        <http:raml-api-configuration location="https://anypoint.mulesoft.com/apiplatform/repository/v2/organizations/b2a62341-7289-4b81-93a9-6ccf106384c1/public/apis/36196/versions/37782/files/root"/>
+    </http:request-config>
     <flow name="dw-runner-main">
         <http:listener xmlns:http="http://www.mulesoft.org/schema/mule/http" config-ref="dw-runner-httpListenerConfig" path="/api/*" doc:name="HTTP"/>
         <apikit:router xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" config-ref="dw-runner-config" doc:name="APIkit Router"/>
         <exception-strategy ref="dw-runner-apiKitGlobalExceptionMapping" doc:name="Reference Exception Strategy"/>
     </flow>
-    <flow name="unescapeJsonString">
-        <object-to-string-transformer mimeType="application/json" doc:name="Object to String"/>
-    </flow>
-    <flow name="post:/dw/test:dw-runner-config">
-        <logger message="#[&quot;\n######### ===INPUT=== ########\n&quot; + message.payloadAs(java.lang.String)]" level="INFO" doc:name="Logger"/>
-        <dw:transform-message doc:name="Transform Message">
+    <flow name="post:/test:dw-runner-config">
+        <logger message="#[&quot;\n######### ===INPUT=== ########\n&quot; + message.payloadAs(java.lang.String)]" level="INFO" doc:name="Log input"/>
+        <set-variable variableName="extra" value="#[dw(&quot;payload.extra&quot;)]" mimeType="application/json" doc:name="set extra"/>
+        <set-variable variableName="test" value="#[dw(&quot;payload.test&quot;)]"  doc:name="set test"/>
+		<dw:transform-message doc:name="Transform Message">
         	<dw:input-payload mimeType="application/json" />
             <dw:set-payload><![CDATA[%dw 1.0
-%output application/java
+%output application/json
 ---
-using (extra = lookup("unescapeJsonString", payload.extra))
-//using (extra = payload.extra)
+using (extra = flowVars.extra)
 {
-	inputs: extra.inputs map ($ as :object {class: "org.mule.dw.RequestInput"}),
+	inputs: extra.inputs,
 	transform: (extra.content default "") ++ payload.content,
-//	output: payload.mimeType
-	output: extra.outputType
+	mimeType: extra.outputType
 }]]></dw:set-payload>
         </dw:transform-message>
-        <expression-component metadata:id="70779afb-e72b-4e1f-b7ed-a4c14b509f8e" doc:name="Execute DW"><![CDATA[import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import org.mule.dw.RequestInput;
-import org.mule.dw.OutputResult;
-
-
-import com.mulesoft.weave.mule.Input;
-import com.mulesoft.weave.mule.Output;
-import com.mulesoft.weave.mule.WeaveEngineHelper;
-
-List inputList = new ArrayList();
-for (RequestInput requestInput : payload.inputs) {
-	 String content = requestInput.getContent().toString();
-	 Input input = new Input(content, requestInput.getName(), requestInput.getMimeType());
-	inputList.add(input);
-}
-
-Output output = WeaveEngineHelper.execute(payload.transform, inputList,payload.output);
-payload = new OutputResult(output.content().toString(), output.mime());]]></expression-component>
-        <dw:transform-message doc:name="Transform Message">
-            <dw:set-payload><![CDATA[%dw 1.0
+        <http:request config-ref="HTTP_Request_Configuration" path="/exec" method="POST" doc:name="HTTP"/>
+        <choice doc:name="Choice">
+            <when expression="#[dw(&quot;payload.content&quot;).equals(flowVars.test)]">
+                <dw:transform-message doc:name="Passed Tests">
+                    <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 ---
 {
@@ -63,8 +45,23 @@ payload = new OutputResult(output.content().toString(), output.mime());]]></expr
 	feedback: "",
 	expectationResults: []
 }]]></dw:set-payload>
-        </dw:transform-message>
-        <logger message="#[&quot;\n######### ===OUTPUT=== ########\n&quot; + message.payloadAs(java.lang.String)]" level="INFO" doc:name="Copy_of_Logger"/>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Failed Tests">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	exit: "failed",
+	out: payload.content,
+	feedback: "",
+	expectationResults: []
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+        <logger message="#[&quot;\n######### ===OUTPUT=== ########\n&quot; + message.payloadAs(java.lang.String)]" level="INFO" doc:name="Log output"/>
         <catch-exception-strategy doc:name="Catch Exception Strategy">
             <set-payload value="#[exception.getCauseException().getMessage()]" doc:name="Build Exception Information"/>
             <dw:transform-message doc:name="To Json Data">
@@ -85,7 +82,7 @@ payload = new OutputResult(output.content().toString(), output.mime());]]></expr
         <apikit:mapping statusCode="400">
             <apikit:exception value="java.lang.Exception"/>
             <set-payload value="#[exception.getCauseException().getMessage()]" doc:name="Copy_of_Build Exception Information"/>
-            <dw:transform-message doc:name="Copy_of_To Json Data">
+            <dw:transform-message doc:name="Json Data">
                 <dw:input-payload doc:sample="UserDefined.dwl"/>
                 <dw:set-payload><![CDATA[%dw 1.0
 %output application/json

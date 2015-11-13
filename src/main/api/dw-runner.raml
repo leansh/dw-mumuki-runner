@@ -2,11 +2,11 @@
 ---
 title: DataWeave Runner
 version: v1
-baseUri: http://localhost:8081/api
+baseUri: http://mumuki-dw-runner.cloudhub.io/api
 documentation: 
   - title: DataWeave Runner
     content: Allows the interaction with mumuki
-/dw/test: 
+/test: 
   post: 
     body: 
       application/json: 
@@ -14,8 +14,8 @@ documentation:
           {
             "locale": "en",
             "content": "a: 1",
-            "test": "expected output",
-            "extra": "{\r\n  \"inputs\" : [{\r\n      \"name\" : \"in0\",\r\n      \"content\" : \"{\\\"name\\\" : \\\"Martin\\\"}\",\r\n      \"mimeType\" : \"application\/json\"\r\n    }],\r\n  \"outputType\" : \"application\/json\",\r\n  \"content\" : \"%dw 1.0\\n---\\n\"\r\n}",
+            "test": "a:1",
+            "extra": "{\n  \"inputs\" : [\n    {\n  \t\t\"name\" : \"in0\",\n  \t\t\"content\" : \"{\\\"name\\\" : \\\"Martin\\\"}\",\n  \t\t\"mimeType\" : \"application/json\"\n    }\n  ],\n  \"outputType\" : \"application/json\",\n  \"content\" : \"%dw 1.0\\n---\\n\"\n}",
             "expectations": [
               {
                 "binding": "..the binding...", 
@@ -39,7 +39,9 @@ documentation:
                   {
                     "expectation": {
                       "binding": "..the binding...", 
-                      "inspection": "...the inspection..."}, 
-                      "result": "true/false"}
+                      "inspection": "...the inspection..."
+                    },
+                    "result": "true/false"
+                  }
                 ]
               }
